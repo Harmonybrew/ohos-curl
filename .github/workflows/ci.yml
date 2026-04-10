@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: [ "main" ]
+
+permissions: write-all
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: ghcr.io/hqzing/dockerharmony:latest
+      volumes:
+        - /opt/node24:/__e/node24:rw,rshared
+    steps:
+      - name: Setup Node.js for actions
+        run: |
+          curl -fsSLO https://github.com/hqzing/ohos-node/releases/download/v24.2.0/node-v24.2.0-openharmony-arm64.tar.gz
+          mkdir /__e/node24/bin
+          tar -zxf node-v24.2.0-openharmony-arm64.tar.gz -C /opt
+          ln -s /opt/node-v24.2.0-openharmony-arm64/bin/node /__e/node24/bin/node
+          rm node-v24.2.0-openharmony-arm64.tar.gz
+
+      - name: Setup GitHub CLI
+        run: |
+          curl -fsSLO https://github.com/cli/cli/releases/download/v2.89.0/gh_2.89.0_linux_arm64.tar.gz
+          tar -zxf gh_2.89.0_linux_arm64.tar.gz
+          mv gh_2.89.0_linux_arm64/bin/gh /bin/
+          rm -rf gh_2.89.0_linux_arm64*
+
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          path: curl-8.19.0-ohos-arm64.tar.gz
+
+      - name: Upload release asset
+        if: github.event_name == 'release'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ github.ref_name }} curl-8.19.0-ohos-arm64.tar.gz --clobber --repo ${{ github.repository }}
